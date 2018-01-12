@@ -15,7 +15,7 @@ for curr in currs:
 for curr in currs:
     print "Loading and dictionarizing data for " + curr
     files = glob.glob("data/cc_json/*" + curr + "*.json")
-    
+
     for fileName in files:        
         f = open(fileName)
         json_data = json.load(f)
@@ -50,15 +50,30 @@ if count == 0:
 else:
     print "Some hourly data points are missing..."
 
-with open('eggs.csv', 'wb') as csvfile:
-    spamwriter = csv.writer(csvfile, delimiter=',',
+with open('consolidated_data.csv', 'wb') as csvfile:
+    csvwriter = csv.writer(csvfile, delimiter=',',
                             quotechar='|', quoting=csv.QUOTE_MINIMAL)
-    
+
+
+
+    prevRow = 0
+    headerRow = ["Unix Date"]
+    for curr in currs:
+        headerRow.append( curr + " Px")
+        headerRow.append( curr + " Volume")
+        
+    csvwriter.writerow( headerRow )
     for ts in sortedExistingTSs:
         thisRow = [ts]
         for curr in currs:
-            thisRow.append( currData[curr][ts]["volume"] )
-            thisRow.append( currData[curr][ts]["closePx"] )
-
-        spamwriter.writerow( thisRow )
+            if ( currData[curr][ts]["closePx"] > 0 ) or ( prevRow == 0 ):
+                thisRow.append( currData[curr][ts]["closePx"] )
+                thisRow.append( currData[curr][ts]["volume"] )
+            else:
+                print "Found 0 value for px data for " + curr
+                thisRow.append( currData[curr][prevRow]["closePx"] )
+                thisRow.append( currData[curr][prevRow]["volume"] )
+                
+        csvwriter.writerow( thisRow )
+        prevrow = [ts]
     
