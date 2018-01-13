@@ -1,4 +1,5 @@
 # Import
+import csv
 import tensorflow as tf
 import numpy as np
 import pandas as pd
@@ -15,7 +16,7 @@ y_data = "BTC Px"
 print "Using " + y_data + " as the dataset we want to predict"
 
 #how many hours into the future will we predict
-y_offset_predict = 5 
+y_offset_predict = 24
 
 data["y_axis"] = data[y_data]
 data["y_axis"].shift(-y_offset_predict)
@@ -45,6 +46,8 @@ test_end = n
 data_train = data[np.arange(train_start, train_end), :]
 data_test = data[np.arange(test_start, test_end), :]
 
+print "Test data ends at " + str(train_end)
+
 # Scale data
 scaler = MinMaxScaler(feature_range=(-1, 1))
 scaler.fit(data_train)
@@ -65,6 +68,11 @@ n_neurons_1 = 1024
 n_neurons_2 = 512
 n_neurons_3 = 256
 n_neurons_4 = 128
+
+#n_neurons_1 = 2048
+#n_neurons_2 = 1024
+#n_neurons_3 = 512
+#n_neurons_4 = 256
 
 # Session
 net = tf.InteractiveSession()
@@ -93,10 +101,17 @@ W_out = tf.Variable(weight_initializer([n_neurons_4, 1]))
 bias_out = tf.Variable(bias_initializer([1]))
 
 # Hidden layer
+# RELU approach (generally better and more widely adopted
 hidden_1 = tf.nn.relu(tf.add(tf.matmul(X, W_hidden_1), bias_hidden_1))
 hidden_2 = tf.nn.relu(tf.add(tf.matmul(hidden_1, W_hidden_2), bias_hidden_2))
 hidden_3 = tf.nn.relu(tf.add(tf.matmul(hidden_2, W_hidden_3), bias_hidden_3))
 hidden_4 = tf.nn.relu(tf.add(tf.matmul(hidden_3, W_hidden_4), bias_hidden_4))
+
+# Sigmoid approach, old school ML
+#hidden_1 = tf.sigmoid(tf.add(tf.matmul(X, W_hidden_1), bias_hidden_1))
+#hidden_2 = tf.sigmoid(tf.add(tf.matmul(hidden_1, W_hidden_2), bias_hidden_2))
+#hidden_3 = tf.sigmoid(tf.add(tf.matmul(hidden_2, W_hidden_3), bias_hidden_3))
+#hidden_4 = tf.sigmoid(tf.add(tf.matmul(hidden_3, W_hidden_4), bias_hidden_4))
 
 # Output layer (transpose!)
 out = tf.transpose(tf.add(tf.matmul(hidden_4, W_out), bias_out))
@@ -125,6 +140,8 @@ mse_test = []
 
 # Run
 epochs = 10
+
+pred = 0
 for e in range(epochs):
 
     # Shuffle training data
@@ -153,3 +170,9 @@ for e in range(epochs):
             plt.title('Epoch ' + str(e) + ', Batch ' + str(i))
             plt.pause(0.01)
             plt.savefig('images/epoch' + str(e) + "-" + str(i) + '.png')
+
+
+a = zip( y_test, pred[0])
+np.savetxt('prediction.csv', a, newline="\n", fmt="%1.2f")
+
+inverse_transform(a)
