@@ -19,7 +19,7 @@ print "Using " + y_data + " as the dataset we want to predict"
 y_offset_predict = 24
 
 data["y_axis"] = data[y_data]
-data["y_axis"].shift(-y_offset_predict)
+data["y_axis"] = data["y_axis"].shift(-y_offset_predict)
 
 # Dimensions of dataset
 n = data.shape[0] #should be same as n above
@@ -36,15 +36,15 @@ cols = cols[-1:] + cols[:-1]
 data = data[cols]
     
 # Make data a np.array
-data = data.values
+np_data = data.values
 
 # Training and test data
 train_start = 0
-train_end = int(np.floor(0.8*n))
+train_end = int(np.floor(0.9*n))
 test_start = train_end + 1
 test_end = n
-data_train = data[np.arange(train_start, train_end), :]
-data_test = data[np.arange(test_start, test_end), :]
+data_train = np_data[np.arange(train_start, train_end), :]
+data_test = np_data[np.arange(test_start, test_end), :]
 
 print "Test data ends at " + str(train_end)
 
@@ -69,10 +69,10 @@ n_neurons_2 = 512
 n_neurons_3 = 256
 n_neurons_4 = 128
 
-#n_neurons_1 = 2048
-#n_neurons_2 = 1024
-#n_neurons_3 = 512
-#n_neurons_4 = 256
+#n_neurons_1 = 512
+#n_neurons_2 = 256
+#n_neurons_3 = 128
+#n_neurons_4 = 64
 
 # Session
 net = tf.InteractiveSession()
@@ -139,9 +139,10 @@ mse_train = []
 mse_test = []
 
 # Run
-epochs = 10
-
+epochs = 1
 pred = 0
+
+print str ( len(y_train // batch_size ) )
 for e in range(epochs):
 
     # Shuffle training data
@@ -158,7 +159,7 @@ for e in range(epochs):
         net.run(opt, feed_dict={X: batch_x, Y: batch_y})
 
         # Show progress
-        if np.mod(i, 50) == 0:
+        if np.mod(i, 10) == 0:
             # MSE train and test
             mse_train.append(net.run(mse, feed_dict={X: X_train, Y: y_train}))
             mse_test.append(net.run(mse, feed_dict={X: X_test, Y: y_test}))
@@ -171,8 +172,10 @@ for e in range(epochs):
             plt.pause(0.01)
             plt.savefig('images/epoch' + str(e) + "-" + str(i) + '.png')
 
+data_test_orig = scaler.inverse_transform( data_test )
+data_test[:,0] = pred[0]
+data_test_pred = scaler.inverse_transform( data_test )
 
-a = zip( y_test, pred[0])
-np.savetxt('prediction.csv', a, newline="\n", fmt="%1.2f")
-
-inverse_transform(a)
+#assumes 1st 2 columns are BTC px data
+a = zip( data_test_orig[:,0], data_test_pred[:,0] ) 
+np.savetxt('prediction.csv', a, newline="\n", fmt="%1.2f", delimiter=",")
