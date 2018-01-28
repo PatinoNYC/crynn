@@ -40,17 +40,16 @@ train_start = 0
 train_end = int(np.floor(0.80*n))
 test_start = train_end + 1
 test_end = n
-data_train = data[train_start:train_end].copy()
-data_test  = data[test_start :test_end ].copy()
-test_dps = test_end - test_start
+data_train = data[train_start:train_end]
+data_test  = data[test_start :test_end ]
 
 print "Test data ends at " + str(train_end)
 
 # Build X and y
-X_train = data_train[:, 1:]
-y_train = data_train[:, 0]
-X_test = data_test[:, 1:]
-y_test = data_test[:, 0]
+X_train = data_train[ cols[1:] ]
+y_train = data_train[ y_data ]
+X_test  = data_test[ cols[1:] ]
+y_test  = data_test[ y_data ]
 
 # Number of stocks in training data
 n_features = X_train.shape[1]
@@ -61,42 +60,44 @@ n_periods = 24
 #construct our batches to input to the NN
 #training data
 y_train_clipped = y_train[n_periods:]
-a = y_train_clipped[np.newaxis]
-y_batches = np.transpose( a )
 
-trainable_dps = y_train_clipped.shape[0]
+#convert to NumPy form...
+y_train_clipped = np.array( y_train_clipped )
+
+# trainable Y data points 
+trainable_dps = len ( y_train_clipped )
 
 norm_cols = [coin+metric for coin in ['BTC ', 'ETH ', 'LTC ', 'XRP '] for metric in ['Px','Volume']]
 
-X_batches = []
+X_train_batches = []
 for i in range ( trainable_dps ):
     temp_set = X_train[i:(i+n_periods)].copy()
     for col in norm_cols:
         temp_set.loc[:, col] = temp_set[col]/temp_set[col].iloc[0] - 1
-    X_batches.append(temp_set)
+    temp_set = temp_set.fillna(0)
+    temp_set = temp_set.replace([np.inf, -np.inf], 99)
+    X_train_batches.append(temp_set)
 
-
-
-
-
-
-
-
-
-
-
-
-
-    
 # test/validation data sets
 y_test_clipped = y_test[n_periods:]
-a = y_test_clipped[np.newaxis]
-y_test_batch = np.transpose( a )
+y_test_clipped = np.array ( y_test_clipped ) 
+test_dps = len ( y_test_clipped )
 
-test_dps = y_test_clipped.shape[0]
-X_test_batch = np.empty( [ test_dps, n_periods * n_features] )
-for j in range( test_dps ):
-    X_test_batch[j] = X_test[j:j+n_periods,:].reshape( 1, n_periods * n_features )
+X_test_batches = []
+for i in range ( test_dps ):
+    temp_set = X_test[i:(i+n_periods)].copy()
+    for col in norm_cols:
+        temp_set.loc[:, col] = temp_set[col]/temp_set[col].iloc[0] - 1
+    temp_set = temp_set.fillna(0)
+    temp_set = temp_set.replace([np.inf, -np.inf], 99)
+    X_test_batches.append(temp_set)
+
+
+X_train_batches = [np.array(X_train_batches) for X_train_batches in X_train_batches]
+X_train_batches = np.array(X_train_batches)
+
+X_test_batches = [np.array(X_test_batch) for X_test_batch in X_test_batches]
+X_test_batches = np.array(X_test_batches)
 
 # import the relevant Keras modules
 from keras.models import Sequential
@@ -120,8 +121,42 @@ def build_model(inputs, output_size, neurons, activ_func="linear",
 np.random.seed(202)
 
 # initialise model architecture
-model = build_model(X_batches, output_size=1, neurons = 20)
+model = build_model(X_train_batches, output_size=1, neurons = 20)
 
 # train model on data
 # note: history contains information on the training error per epoch
-history = model.fit(X_batches, y_batches, epochs=50, batch_size=1, verbose=2, shuffle=True)
+history = model.fit(X_train_batches, y_train_clipped, epochs=50, batch_size=1, verbose=2, shuffle=True)
+
+# plot error over epoch
+fig, ax1 = plt.subplots(1,1)
+
+ax1.plot(history.epoch, history.history['loss'])
+ax1.set_title('Training Error')
+
+if model.loss == 'mae':
+    ax1.set_ylabel('Mean Absolute Error (MAE)',fontsize=12)
+# just in case you decided to change the model loss calculation
+else:
+    ax1.set_ylabel('Model Loss',fontsize=12)
+ax1.set_xlabel('# Epochs',fontsize=12)
+plt.show()
+
+
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+
+fig, ax1 = plt.subplots(1,1)
+ax1.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,5,9]])
+ax1.set_xticklabels([datetime.date(i,j,1).strftime('%b %Y')  for i in range(2013,2019) for j in [1,5,9]])
+
+ax1.plot(data[n_periods:train_end]['Date'][n_periods:].astype(datetime.datetime),
+         data[y_data][n_periods:train_end], label='Actual')
+ax1.plot(data[y_data][test_start+n_periods:test_end]['Date'][n_periods:].astype(datetime.datetime),
+         ((np.transpose(eth_model.predict(LSTM_training_inputs))+1) * training_set['eth_Close'].values[:-window_len])[0], 
+         label='Predicted')
+ax1.set_title('Training Set: Single Timepoint Prediction')
+ax1.set_ylabel('Ethereum Price ($)',fontsize=12)
+ax1.legend(bbox_to_anchor=(0.15, 1), loc=2, borderaxespad=0., prop={'size': 14})
+ax1.annotate('MAE: %.4f'%np.mean(np.abs((np.transpose(eth_model.predict(LSTM_training_inputs))+1)-            (training_set['eth_Close'].values[window_len:])/(training_set['eth_Close'].values[:-window_len]))), 
+             xy=(0.75, 0.9),  xycoords='axes fraction',
+            xytext=(0.75, 0.9), textcoords='axes fraction')
