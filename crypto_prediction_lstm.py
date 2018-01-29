@@ -1,4 +1,6 @@
 # Import
+import datetime
+import time
 import csv
 import tensorflow as tf
 import numpy as np
@@ -10,6 +12,8 @@ import matplotlib.pyplot as plt
 data = pd.read_csv('data/consolidated_data.csv')
 
 # Drop date variable
+dates = np.array ( data['Unix Date'].copy() )
+dates_str = np.asarray( dates, dtype='datetime64[s]')
 data = data.drop(['Unix Date'], 1)
 
 y_data = "BTC Px"
@@ -61,16 +65,16 @@ n_periods = 10
 #training data
 y_train = np.array ( y_train )
 # normalize
-y_train_clipped =  y_train[n_periods:]/y_train[n_periods-1:-1]
+y_train_cn =  y_train[n_periods:]/y_train[n_periods-1:-1] - 1
 
 # trainable Y data points 
-trainable_dps = len ( y_train_clipped )
+train_dps = len ( y_train_cn )
 
 norm_cols = [coin+metric for coin in ['BTC ', 'ETH ', 'LTC ', 'XRP '] for metric in ['Px','Volume']]
 
 X_train_batches = []
-for i in range ( trainable_dps ):
-    if ( i > 500 ): break #HAX
+for i in range ( train_dps ):
+    if i == 500: break
     temp_set = X_train[i:(i+n_periods)].copy()
     for col in norm_cols:
         temp_set.loc[:, col] = temp_set[col]/temp_set[col].iloc[0] - 1
@@ -80,7 +84,7 @@ for i in range ( trainable_dps ):
 
 # test/validation data sets
 y_test = np.array ( y_test )
-y_test_clipped = y_test[n_periods:]/y_test[n_periods-1:-1]
+y_test_clipped = y_test[n_periods:]/y_test[n_periods-1:-1] - 1
 test_dps = len ( y_test_clipped )
 
 X_test_batches = []
@@ -126,8 +130,8 @@ model = build_model(X_train_batches, output_size=1, neurons = 10)
 # train model on data
 # note: history contains information on the training error per epoch
 
-y_train_clipped2 = y_train_clipped[0:501]
-history = model.fit(X_train_batches, y_train_clipped2, epochs=50, batch_size=1, verbose=2, shuffle=True)
+y_train_cn = y_train_cn[0:500]
+history = model.fit(X_train_batches, y_train_cn, epochs=50, batch_size=1, verbose=2, shuffle=True)
 
 # plot error over epoch
 fig, ax1 = plt.subplots(1,1)
@@ -151,17 +155,9 @@ fig, ax1 = plt.subplots(1,1)
 ax1.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,5,9]])
 ax1.set_xticklabels([datetime.date(i,j,1).strftime('%b %Y')  for i in range(2013,2019) for j in [1,5,9]])
 
-ax1.plot(data[n_periods:train_end]['Date'][n_periods:].astype(datetime.datetime),
-         data[y_data][n_periods:train_end], label='Actual')
-ax1.plot(data[n_periods:train_end]['Date'][n_periods:].astype(datetime.datetime),
+ax1.plot(np.arange(500), y_train[n_periods:n_periods+500], label='Actual')
+ax1.plot(np.arange(500), np.transpose( (np.transpose( model.predict( X_train_batches ) + 1 )) * y_train[n_periods:n_periods+500] ), label='Predicted')
 
-         np.transpose( model.predict( X_train_batches ) ) + 1 * 
-
-         ((np.transpose(model.predict())+1) * training_set['eth_Close'].values[:-window_len])[0], 
-         label='Predicted')
 ax1.set_title('Training Set: Single Timepoint Prediction')
-ax1.set_ylabel('Ethereum Price ($)',fontsize=12)
+ax1.set_ylabel(y_data, fontsize=12)
 ax1.legend(bbox_to_anchor=(0.15, 1), loc=2, borderaxespad=0., prop={'size': 14})
-ax1.annotate('MAE: %.4f'%np.mean(np.abs((np.transpose(eth_model.predict(LSTM_training_inputs))+1)-            (training_set['eth_Close'].values[window_len:])/(training_set['eth_Close'].values[:-window_len]))), 
-             xy=(0.75, 0.9),  xycoords='axes fraction',
-            xytext=(0.75, 0.9), textcoords='axes fraction')
