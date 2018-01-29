@@ -55,14 +55,13 @@ y_test  = data_test[ y_data ]
 n_features = X_train.shape[1]
 
 # Time Period (hours)
-n_periods = 24
+n_periods = 10
 
 #construct our batches to input to the NN
 #training data
-y_train_clipped = y_train[n_periods:]
-
-#convert to NumPy form...
-y_train_clipped = np.array( y_train_clipped )
+y_train = np.array ( y_train )
+# normalize
+y_train_clipped =  y_train[n_periods:]/y_train[n_periods-1:-1]
 
 # trainable Y data points 
 trainable_dps = len ( y_train_clipped )
@@ -71,6 +70,7 @@ norm_cols = [coin+metric for coin in ['BTC ', 'ETH ', 'LTC ', 'XRP '] for metric
 
 X_train_batches = []
 for i in range ( trainable_dps ):
+    if ( i > 500 ): break #HAX
     temp_set = X_train[i:(i+n_periods)].copy()
     for col in norm_cols:
         temp_set.loc[:, col] = temp_set[col]/temp_set[col].iloc[0] - 1
@@ -79,8 +79,8 @@ for i in range ( trainable_dps ):
     X_train_batches.append(temp_set)
 
 # test/validation data sets
-y_test_clipped = y_test[n_periods:]
-y_test_clipped = np.array ( y_test_clipped ) 
+y_test = np.array ( y_test )
+y_test_clipped = y_test[n_periods:]/y_test[n_periods-1:-1]
 test_dps = len ( y_test_clipped )
 
 X_test_batches = []
@@ -121,11 +121,13 @@ def build_model(inputs, output_size, neurons, activ_func="linear",
 np.random.seed(202)
 
 # initialise model architecture
-model = build_model(X_train_batches, output_size=1, neurons = 20)
+model = build_model(X_train_batches, output_size=1, neurons = 10)
 
 # train model on data
 # note: history contains information on the training error per epoch
-history = model.fit(X_train_batches, y_train_clipped, epochs=50, batch_size=1, verbose=2, shuffle=True)
+
+y_train_clipped2 = y_train_clipped[0:501]
+history = model.fit(X_train_batches, y_train_clipped2, epochs=50, batch_size=1, verbose=2, shuffle=True)
 
 # plot error over epoch
 fig, ax1 = plt.subplots(1,1)
@@ -151,8 +153,11 @@ ax1.set_xticklabels([datetime.date(i,j,1).strftime('%b %Y')  for i in range(2013
 
 ax1.plot(data[n_periods:train_end]['Date'][n_periods:].astype(datetime.datetime),
          data[y_data][n_periods:train_end], label='Actual')
-ax1.plot(data[y_data][test_start+n_periods:test_end]['Date'][n_periods:].astype(datetime.datetime),
-         ((np.transpose(eth_model.predict(LSTM_training_inputs))+1) * training_set['eth_Close'].values[:-window_len])[0], 
+ax1.plot(data[n_periods:train_end]['Date'][n_periods:].astype(datetime.datetime),
+
+         np.transpose( model.predict( X_train_batches ) ) + 1 * 
+
+         ((np.transpose(model.predict())+1) * training_set['eth_Close'].values[:-window_len])[0], 
          label='Predicted')
 ax1.set_title('Training Set: Single Timepoint Prediction')
 ax1.set_ylabel('Ethereum Price ($)',fontsize=12)
