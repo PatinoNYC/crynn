@@ -134,9 +134,6 @@ model = build_model(X_train_batches, output_size=pred_range, neurons = 20)
 
 history = model.fit(X_train_batches, y_train_outputs, epochs=50, batch_size=1, verbose=2, shuffle=True)
 
-# we may use dates on the X-axis.  we may not!
-datetime_list = dates_str.tolist()
-
 # plot error over epochs
 fig, ax1 = plt.subplots(1,1)
 
@@ -159,18 +156,18 @@ predictions = x * y
 #plotting Act vs Pred from training data
 fig, ax1 = plt.subplots(1,1)
 
-ax1.set_xticks( dates )
-ax1.set_xticklabels([datetime.date(i,j,1).strftime('%b %Y')  for i in range(2013,2019) for j in [1,5,9]])
+ax1.set_xticks( dates_pd[test_start:][::720] )
+ax1.set_xticklabels( dates_pd[test_start:][::720].strftime(' %b %Y' ) )
 
-ax1.plot(dates_pd[n_periods:n_periods+train_dps], y_train[n_periods:n_periods+train_dps], label='Actual')
+ax1.plot(dates_pd[test_start+n_periods:test_start+n_periods+test_dps], y_test[n_periods:n_periods+test_dps], label='Actual')
 
 pred_colors = ["#FF69B4", "#5D6D7E", "#F4D03F","#A569BD","#45B39D"]
 
-for i, (pred) in enumerate(zip ( predictions ) ) :
-    ax1.plot( dates_pd[i*pred_range:i*pred_range+pred_range], pred[0], color=pred_colors[i%5] )
+for i, pred in enumerate( predictions ):
+    ax1.plot( dates_pd[test_start+i*pred_range:test_start+i*pred_range+pred_range], pred, color=pred_colors[i%5] )
 
-ax1.set_title('Training Set: Single Timepoint Prediction')
 ax1.set_ylabel(y_data, fontsize=12)
-ax1.legend(bbox_to_anchor=(0.15, 1), loc=2, borderaxespad=0., prop={'size': 14})
+fig.tight_layout()
+plt.savefig('foo.png')
 
 plt.show()
